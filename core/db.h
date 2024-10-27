@@ -89,7 +89,15 @@ class DB {
   /// @return Zero on success, a non-zero error code on error.
   ///
   virtual int Delete(const std::string &table, const std::string &key) = 0;
-  
+
+  virtual bool HaveBalancedDistribution() { return true;};
+
+  virtual void PrintStats() {};
+ 
+  virtual void RecordTime(int op,uint64_t tx_time) {};
+
+  virtual void latency_hiccup(uint64_t iops) {};
+
   virtual ~DB() { }
 };
 
