@@ -8,10 +8,15 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include <hdr/hdr_thread.h>
+#include <hdr/hdr_writer_reader_phaser.h>
 #include "hdr_atomic.h"
-#include "hdr_thread.h"
 
-#include "hdr_writer_reader_phaser.h"
+#ifndef HDR_MALLOC_INCLUDE
+#define HDR_MALLOC_INCLUDE "hdr_malloc.h"
+#endif
+
+#include HDR_MALLOC_INCLUDE
 
 static int64_t _hdr_phaser_get_epoch(int64_t* field)
 {
@@ -71,7 +76,7 @@ int64_t hdr_phaser_writer_enter(struct hdr_writer_reader_phaser* p)
 void hdr_phaser_writer_exit(
     struct hdr_writer_reader_phaser* p, int64_t critical_value_at_enter)
 {
-    int64_t* end_epoch = 
+    int64_t* end_epoch =
         (critical_value_at_enter < 0) ? &p->odd_end_epoch : &p->even_end_epoch;
     hdr_atomic_add_fetch_64(end_epoch, 1);
 }

@@ -1,10 +1,22 @@
-cmake_minimum_required(VERSION 2.8)
-
-if("${CMAKE_VERSION}" VERSION_GREATER 3.0.0)
-    cmake_policy(SET CMP0042 NEW)
+cmake_minimum_required(VERSION 3.12)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
 endif()
 
-project("hdr_histogram")
+file(STRINGS "include/hdr/hdr_histogram_version.h" HDR_VERSION_HEADER)
+string(REGEX MATCH ".*#define HDR_HISTOGRAM_VERSION \"(.*)\".*" HDR_BLACK_HOLE ${HDR_VERSION_HEADER})
+
+project(hdr_histogram
+    VERSION ${CMAKE_MATCH_1}
+    LANGUAGES C
+    DESCRIPTION "C port of the HdrHistogram"
+    HOMEPAGE_URL "http://hdrhistogram.github.io/HdrHistogram/")
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 # Follow all steps below in order to calculate new ABI version when updating the library
 # NOTE: THIS IS UNRELATED to the actual project version
@@ -14,38 +26,99 @@ project("hdr_histogram")
 # 3. If any interfaces have been added since the last public release, then increment age.
 # 4. If any interfaces have been removed since the last public release, then set age to 0.
 
-set(HDR_SOVERSION_CURRENT   5)
-set(HDR_SOVERSION_AGE       0)
-set(HDR_SOVERSION_REVISION  0)
+set(HDR_SOVERSION_CURRENT   6)
+set(HDR_SOVERSION_AGE       1)
+set(HDR_SOVERSION_REVISION  3)
 
 set(HDR_VERSION ${HDR_SOVERSION_CURRENT}.${HDR_SOVERSION_AGE}.${HDR_SOVERSION_REVISION})
 set(HDR_SOVERSION ${HDR_SOVERSION_CURRENT})
+option(HDR_LOG_REQUIRED "HDR Logging component required" ON)
 
-ENABLE_TESTING()
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(UNIX)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unknown-pragmas -Wextra -Wshadow -Winit-self -Wmissing-prototypes -Wpedantic -D_GNU_SOURCE -std=gnu89 -fPIC")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -g")
+    add_compile_options(
+        -Wall
+        -Wno-unknown-pragmas
+        -Wextra
+        -Wshadow
+        -Winit-self
+        -Wpedantic
+        $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>)
+    add_definitions(-D_GNU_SOURCE)
 endif()
 
-if(WIN32)
-    find_package (zlib REQUIRED)
+find_package(ZLIB)
+find_package(Threads REQUIRED)
+
+if (HDR_LOG_REQUIRED STREQUAL "DISABLED")
+    set(HDR_LOG_ENABLED "FALSE")
 else()
-    find_package (ZLIB REQUIRED)
+    set(HDR_LOG_ENABLED ${ZLIB_FOUND})
+    if (${HDR_LOG_REQUIRED} AND NOT HDR_LOG_ENABLED)
+        message(SEND_ERROR "HDR_LOG_REQUIRED=ON and unable to find zlib library")
+    endif()
 endif()
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/src")
+add_subdirectory(include)
+add_subdirectory(src)
 
 option(HDR_HISTOGRAM_BUILD_PROGRAMS "Build tests and examples" ON)
 if(HDR_HISTOGRAM_BUILD_PROGRAMS)
-  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/test")
-  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/examples")
-endif(HDR_HISTOGRAM_BUILD_PROGRAMS)
+    include(CTest)
 
-SET(CPACK_GENERATOR "TGZ")
-SET(CPACK_PACKAGE_VERSION "0.9.12")
+    if(BUILD_TESTING)
+        add_subdirectory(test)
+    endif()
 
-INCLUDE(CPack)
+    add_subdirectory(examples)
+endif()
+
+write_basic_package_version_file(
+    ${PROJECT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion)
+configure_file(
+    config.cmake.in
+    ${PROJECT_NAME}-config.cmake
+    @ONLY)
+if(HDR_HISTOGRAM_INSTALL_SHARED OR HDR_HISTOGRAM_INSTALL_STATIC)
+    install(
+        EXPORT ${PROJECT_NAME}-targets
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+        NAMESPACE ${PROJECT_NAME}::)
+endif()
+install(
+    FILES
+        ${PROJECT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
+        ${PROJECT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+set(CPACK_GENERATOR "TGZ")
+include(CPack)
+
+include(JoinPaths)
+
+join_paths(includedir_for_pc_file "\${prefix}" "${CMAKE_INSTALL_INCLUDEDIR}")
+join_paths(libdir_for_pc_file "\${prefix}" "${CMAKE_INSTALL_LIBDIR}")
+
+if(${ZLIB_FOUND})
+    set(PC_REQUIRES_PRIVATE_ZLIB "zlib")
+else()
+    set(PC_REQUIRES_PRIVATE_ZLIB "")
+endif()
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
+    @ONLY
+)
+install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)

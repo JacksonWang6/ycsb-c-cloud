@@ -21,12 +21,14 @@
 #define HDR_VALUE_TRUNCATED -29991
 #define HDR_ENCODED_INPUT_TOO_LONG -29990
 
+#define HDR_LOG_TAG_MAX_BUFFER_LEN (1024)
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "hdr_time.h"
-#include "hdr_histogram.h"
+#include <hdr/hdr_time.h>
+#include <hdr/hdr_histogram.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +43,15 @@ int hdr_log_encode(struct hdr_histogram* histogram, char** encoded_histogram);
  * Decode and decompress the histogram with gzip.
  */
 int hdr_log_decode(struct hdr_histogram** histogram, char* base64_histogram, size_t base64_len);
+
+struct hdr_log_entry
+{
+    hdr_timespec start_timestamp;
+    hdr_timespec interval;
+    hdr_timespec max;
+    char *tag;
+    size_t tag_len;
+};
 
 struct hdr_log_writer
 {
@@ -100,6 +111,35 @@ int hdr_log_write(
     const hdr_timespec* end_timestamp,
     struct hdr_histogram* histogram);
 
+/**
+ * Write an hdr_histogram entry to the log.  It will be encoded in a similar
+ * fashion to the approach used by the Java version of the HdrHistogram.  It will
+ * be a CSV line consisting of [Tag=XXX,]<start timestamp>,<end timestamp>,<max>,<histogram>
+ * where <histogram> is the binary histogram gzip compressed and base64 encoded.
+ *
+ * The tag is option and will only be written if the tag is non-NULL and the tag_len is
+ * greater than 0.
+ *
+ * Timestamp is a bit of misnomer for the start_timestamp and end_timestamp values
+ * these could be offsets, e.g. start_timestamp could be offset from process start
+ * time and end_timestamp could actually be the length of the recorded interval.
+ *
+ * @param writer 'This' pointer
+ * @param file The stream to write the entry to.
+ * @param entry Prefix information for the log line, including timestamps and tag.
+ * @param histogram The histogram to encode and log.
+ * @return Will return 0 if it successfully completed or an error number if there
+ * was a failure.  Errors include HDR_DEFLATE_INIT_FAIL, HDR_DEFLATE_FAIL if
+ * something when wrong during gzip compression.  ENOMEM if we failed to allocate
+ * or reallocate the buffer used for encoding (out of memory problem).  EIO if
+ * write failed.
+ */
+int hdr_log_write_entry(
+    struct hdr_log_writer* writer,
+    FILE* file,
+    struct hdr_log_entry* entry,
+    struct hdr_histogram* histogram);
+
 struct hdr_log_reader
 {
     int major_version;
@@ -150,6 +190,36 @@ int hdr_log_read_header(struct hdr_log_reader* reader, FILE* file);
 int hdr_log_read(
     struct hdr_log_reader* reader, FILE* file, struct hdr_histogram** histogram,
     hdr_timespec* timestamp, hdr_timespec* interval);
+
+/**
+ * Reads an entry from the log filling in the specified histogram and log entry struct.
+ * If the supplied pointer to the histogram for this method is
+ * NULL then a new histogram will be allocated for the caller, however it will
+ * become the callers responsibility to free it later.  If the pointer is non-null
+ * the histogram read from the log will be merged with the supplied histogram.
+ * The entry struct contains a pointer to a buffer to load the tag into.  If this
+ * is NULL or the tag_len is 0 then it won't store the tag there.  The tag value will be
+ * NULL-terminated if there available space in the supplied buffer.  If the tag is larger
+ * than the supplied buffer then it will be truncated.  If the caller sets the last element
+ * in the buffer to '\0' before calling this function and it is not '\0' after the function
+ * returns then the value has been truncated.
+ *
+ * @param reader 'This' pointer
+ * @param file The stream to read the histogram from.
+ * @param entry Contains all of the information from the log line that is not the histogram.
+ * @param histogram Pointer to allocate a histogram to or merge into.
+ * @return Will return 0 on success or an error number if there was some wrong
+ * when reading in the histogram.  EOF (-1) will indicate that there are no more
+ * histograms left to be read from 'file'.
+ * HDR_INFLATE_INIT_FAIL or HDR_INFLATE_FAIL if
+ * there was a problem with Gzip.  HDR_COMPRESSION_COOKIE_MISMATCH or
+ * HDR_ENCODING_COOKIE_MISMATCH if the cookie values are incorrect.
+ * HDR_LOG_INVALID_VERSION if the log can not be parsed.  ENOMEM if buffer space
+ * or the histogram can not be allocated.  EIO if there was an error during
+ * the read.  EINVAL in any input values are incorrect.
+ */
+int hdr_log_read_entry(
+    struct hdr_log_reader* reader, FILE* file, struct hdr_log_entry *entry, struct hdr_histogram** histogram);
 
 /**
  * Returns a string representation of the error number.

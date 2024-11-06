@@ -4,8 +4,14 @@
  * as explained at http://creativecommons.org/publicdomain/zero/1.0/
  */
 
+#include <hdr/hdr_interval_recorder.h>
 #include "hdr_atomic.h"
-#include "hdr_interval_recorder.h"
+
+#ifndef HDR_MALLOC_INCLUDE
+#define HDR_MALLOC_INCLUDE "hdr_malloc.h"
+#endif
+
+#include HDR_MALLOC_INCLUDE
 
 int hdr_interval_recorder_init(struct hdr_interval_recorder* r)
 {
@@ -15,7 +21,7 @@ int hdr_interval_recorder_init(struct hdr_interval_recorder* r)
 
 int hdr_interval_recorder_init_all(
     struct hdr_interval_recorder* r,
-    int64_t lowest_trackable_value,
+    int64_t lowest_discernible_value,
     int64_t highest_trackable_value,
     int significant_figures)
 {
@@ -24,7 +30,7 @@ int hdr_interval_recorder_init_all(
     r->active = r->inactive = NULL;
     result = hdr_writer_reader_phaser_init(&r->phaser);
     result = result == 0
-        ? hdr_init(lowest_trackable_value, highest_trackable_value, significant_figures, &r->active)
+        ? hdr_init(lowest_discernible_value, highest_trackable_value, significant_figures, &r->active)
         : result;
 
     return result;
@@ -49,7 +55,7 @@ struct hdr_histogram* hdr_interval_recorder_sample_and_recycle(
 
     if (NULL == histogram_to_recycle)
     {
-        int64_t lo = r->active->lowest_trackable_value;
+        int64_t lo = r->active->lowest_discernible_value;
         int64_t hi = r->active->highest_trackable_value;
         int significant_figures = r->active->significant_figures;
         hdr_init(lo, hi, significant_figures, &histogram_to_recycle);

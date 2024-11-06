@@ -10,7 +10,7 @@
 #include <errno.h>
 
 #include <stdio.h>
-#include <hdr_histogram.h>
+#include <hdr/hdr_histogram.h>
 #include <pthread.h>
 
 #include "minunit.h"
@@ -40,7 +40,7 @@ static void* record_values(void* thread_context)
 }
 
 
-static char* test_recording_concurrently()
+static char* test_recording_concurrently(void)
 {
     const int value_count = 10000000;
     int64_t* values = calloc(value_count, sizeof(int64_t));
@@ -60,7 +60,7 @@ static char* test_recording_concurrently()
     {
         values[i] = rand() % 20000;
     }
-    
+
     for (i = 0; i < value_count; i++)
     {
         hdr_record_value(expected_histogram, values[i]);
@@ -85,14 +85,14 @@ static char* test_recording_concurrently()
     return compare_histograms(expected_histogram, actual_histogram);
 }
 
-static struct mu_result all_tests()
+static struct mu_result all_tests(void)
 {
     mu_run_test(test_recording_concurrently);
 
     mu_ok;
 }
 
-static int hdr_histogram_run_tests()
+static int hdr_histogram_run_tests(void)
 {
     struct mu_result result = all_tests();
 
@@ -110,7 +110,7 @@ static int hdr_histogram_run_tests()
     return result.message == NULL ? 0 : -1;
 }
 
-int main()
+int main(void)
 {
     return hdr_histogram_run_tests();
 }

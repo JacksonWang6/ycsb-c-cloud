@@ -14,10 +14,10 @@
 #include <time.h>
 
 #include <stdio.h>
-#include "hdr_time.h"
-#include <hdr_histogram.h>
-#include <hdr_histogram_log.h>
-#include <hdr_encoding.h>
+#include <hdr/hdr_time.h>
+#include <hdr/hdr_histogram.h>
+#include <hdr/hdr_histogram_log.h>
+#include "hdr_encoding.h"
 #include "minunit.h"
 
 #if defined(_MSC_VER)
@@ -159,7 +159,7 @@ static bool compare_histogram(struct hdr_histogram* a, struct hdr_histogram* b)
 static struct hdr_histogram* raw_histogram = NULL;
 static struct hdr_histogram* cor_histogram = NULL;
 
-static void load_histograms()
+static void load_histograms(void)
 {
     int i;
 
@@ -199,7 +199,7 @@ int hdr_decode_compressed(
     uint8_t* buffer, size_t length, struct hdr_histogram** histogram);
 void hex_dump (char *desc, void *addr, int len);
 
-static char* test_encode_and_decode_compressed()
+static char* test_encode_and_decode_compressed(void)
 {
     uint8_t* buffer = NULL;
     size_t len = 0;
@@ -228,7 +228,7 @@ static char* test_encode_and_decode_compressed()
     return 0;
 }
 
-static char* test_encode_and_decode_compressed2()
+static char* test_encode_and_decode_compressed2(void)
 {
     uint8_t* buffer = NULL;
     size_t len = 0;
@@ -257,7 +257,7 @@ static char* test_encode_and_decode_compressed2()
     return 0;
 }
 
-static char* test_bounds_check_on_decode()
+static char* test_bounds_check_on_decode(void)
 {
     uint8_t* buffer = NULL;
     size_t len = 0;
@@ -279,7 +279,7 @@ static char* test_bounds_check_on_decode()
     return 0;
 }
 
-static char* test_encode_and_decode_base64()
+static char* test_encode_and_decode_base64(void)
 {
     uint8_t* buffer = NULL;
     uint8_t* decoded = NULL;
@@ -306,7 +306,7 @@ static char* test_encode_and_decode_base64()
     return 0;
 }
 
-static char* test_encode_and_decode_empty()
+static char* test_encode_and_decode_empty(void)
 {
     uint8_t* buffer;
     uint8_t* decoded;
@@ -336,7 +336,7 @@ static char* test_encode_and_decode_empty()
     return 0;
 }
 
-static char* test_encode_and_decode_compressed_large()
+static char* test_encode_and_decode_compressed_large(void)
 {
     const int64_t limit = INT64_C(3600) * 1000 * 1000;
     struct hdr_histogram* actual = NULL;
@@ -388,7 +388,7 @@ static bool assert_base64_encode(const char* input, const char* expected)
     return result;
 }
 
-static char* base64_encode_encodes_without_padding()
+static char* base64_encode_encodes_without_padding(void)
 {
     mu_assert(
         "Encoding without padding",
@@ -399,7 +399,7 @@ static char* base64_encode_encodes_without_padding()
     return 0;
 }
 
-static char* base64_encode_encodes_with_padding()
+static char* base64_encode_encodes_with_padding(void)
 {
     mu_assert(
         "Encoding with padding '='",
@@ -415,7 +415,7 @@ static char* base64_encode_encodes_with_padding()
     return 0;
 }
 
-static char* base64_encode_fails_with_invalid_lengths()
+static char* base64_encode_fails_with_invalid_lengths(void)
 {
     mu_assert(
         "Output length not 4/3 of input length",
@@ -424,7 +424,7 @@ static char* base64_encode_fails_with_invalid_lengths()
     return 0;
 }
 
-static char* base64_encode_block_encodes_3_bytes()
+static char* base64_encode_block_encodes_3_bytes(void)
 {
     char output[5] = { 0 };
 
@@ -434,7 +434,7 @@ static char* base64_encode_block_encodes_3_bytes()
     return 0;
 }
 
-static char* base64_decode_block_decodes_4_chars()
+static char* base64_decode_block_decodes_4_chars(void)
 {
     uint8_t output[4] = { 0 };
 
@@ -456,7 +456,7 @@ static bool assert_base64_decode(const char* base64_encoded, const char* expecte
     return result == 0 && compare_string(expected, (char*)output, output_len);
 }
 
-static char* base64_decode_decodes_strings_without_padding()
+static char* base64_decode_decodes_strings_without_padding(void)
 {
     mu_assert(
         "Encoding without padding",
@@ -467,7 +467,7 @@ static char* base64_decode_decodes_strings_without_padding()
     return 0;
 }
 
-static char* base64_decode_decodes_strings_with_padding()
+static char* base64_decode_decodes_strings_with_padding(void)
 {
     mu_assert(
         "Encoding with padding '='",
@@ -484,7 +484,7 @@ static char* base64_decode_decodes_strings_with_padding()
     return 0;
 }
 
-static char* base64_decode_fails_with_invalid_lengths()
+static char* base64_decode_fails_with_invalid_lengths(void)
 {
     mu_assert("Input length % 4 != 0", hdr_base64_decode(NULL, 5, NULL, 3) != 0);
     mu_assert("Input length < 4", hdr_base64_decode(NULL, 3, NULL, 3) != 0);
@@ -495,34 +495,40 @@ static char* base64_decode_fails_with_invalid_lengths()
     return 0;
 }
 
-static char* writes_and_reads_log()
+static char* writes_and_reads_log(void)
 {
     struct hdr_log_writer writer;
     struct hdr_log_reader reader;
     struct hdr_histogram* read_cor_histogram;
     struct hdr_histogram* read_raw_histogram;
     const char* file_name = "histogram.log";
-    hdr_timespec timestamp;
-    hdr_timespec interval;
     int rc = 0;
     FILE* log_file;
-    hdr_timespec actual_timestamp, actual_interval;
+    const char* tag = "tag_value";
+    char read_tag[32];
+    struct hdr_log_entry write_entry;
+    struct hdr_log_entry read_entry;
 
-    hdr_gettime(&timestamp);
+    hdr_gettime(&write_entry.start_timestamp);
 
-    interval.tv_sec = 5;
-    interval.tv_nsec = 2000000;
+    write_entry.interval.tv_sec = 5;
+    write_entry.interval.tv_nsec = 2000000;
 
     hdr_log_writer_init(&writer);
     hdr_log_reader_init(&reader);
 
     log_file = fopen(file_name, "w+");
 
-    rc = hdr_log_write_header(&writer, log_file, "Test log", &timestamp);
+    rc = hdr_log_write_header(&writer, log_file, "Test log", &write_entry.start_timestamp);
     mu_assert("Failed header write", validate_return_code(rc));
-    hdr_log_write(&writer, log_file, &timestamp, &interval, cor_histogram);
+
+    write_entry.tag = (char *) tag;
+    write_entry.tag_len = strlen(tag);
+    hdr_log_write_entry(&writer, log_file, &write_entry, cor_histogram);
     mu_assert("Failed corrected write", validate_return_code(rc));
-    hdr_log_write(&writer, log_file, &timestamp, &interval, raw_histogram);
+
+    write_entry.tag = NULL;
+    hdr_log_write_entry(&writer, log_file, &write_entry, raw_histogram);
     mu_assert("Failed raw write", validate_return_code(rc));
 
     fprintf(log_file, "\n");
@@ -541,19 +547,25 @@ static char* writes_and_reads_log()
     mu_assert("Incorrect minor version", compare_int(reader.minor_version, 2));
     mu_assert(
         "Incorrect start timestamp",
-        compare_timespec(&reader.start_timestamp, &timestamp));
+        compare_timespec(&reader.start_timestamp, &write_entry.start_timestamp));
 
+    read_entry.tag = read_tag;
+    read_entry.tag_len = sizeof(read_tag);
+    read_entry.tag[0] = '\0';
+    read_entry.tag[read_entry.tag_len - 1] = '\0';
 
-    rc = hdr_log_read(
-        &reader, log_file, &read_cor_histogram,
-        &actual_timestamp, &actual_interval);
+    rc = hdr_log_read_entry(&reader, log_file, &read_entry, &read_cor_histogram);
     mu_assert("Failed corrected read", validate_return_code(rc));
     mu_assert(
-        "Incorrect first timestamp", compare_timespec(&actual_timestamp, &timestamp));
+        "Incorrect first timestamp", compare_timespec(&read_entry.start_timestamp, &write_entry.start_timestamp));
     mu_assert(
-        "Incorrect first interval", compare_timespec(&actual_interval, &interval));
+        "Incorrect first interval", compare_timespec(&read_entry.interval, &write_entry.interval));
+    mu_assert("Incorrect tag", compare_string(read_entry.tag, tag, strlen(tag)));
 
-    rc = hdr_log_read(&reader, log_file, &read_raw_histogram, NULL, NULL);
+    read_entry.tag[0] = '\0';
+    read_entry.tag[read_entry.tag_len - 1] = '\0';
+    rc = hdr_log_read_entry(&reader, log_file, &read_entry, &read_raw_histogram);
+    mu_assert("Should not find tag", read_entry.tag[0] == '\0');
     mu_assert("Failed raw read", validate_return_code(rc));
 
     mu_assert(
@@ -573,7 +585,7 @@ static char* writes_and_reads_log()
     return 0;
 }
 
-static char* log_reader_aggregates_into_single_histogram()
+static char* log_reader_aggregates_into_single_histogram(void)
 {
     const char* file_name = "histogram.log";
     hdr_timespec timestamp;
@@ -638,7 +650,7 @@ static char* log_reader_aggregates_into_single_histogram()
     return 0;
 }
 
-static char* log_reader_fails_with_incorrect_version()
+static char* log_reader_fails_with_incorrect_version(void)
 {
     const char* log_with_invalid_version =
     "#[Test log]\n"
@@ -667,7 +679,7 @@ static char* log_reader_fails_with_incorrect_version()
     return 0;
 }
 
-static char* test_encode_decode_empty()
+static char* test_encode_decode_empty(void)
 {
     char *data;
     struct hdr_histogram *histogram, *hdr_new = NULL;
@@ -683,7 +695,7 @@ static char* test_encode_decode_empty()
     return 0;
 }
 
-static char* test_string_encode_decode()
+static char* test_string_encode_decode(void)
 {
     int i;
     char *data;
@@ -704,7 +716,7 @@ static char* test_string_encode_decode()
     return 0;
 }
 
-static char* test_string_encode_decode_2()
+static char* test_string_encode_decode_2(void)
 {
     int i;
     char *data;
@@ -729,7 +741,7 @@ static char* test_string_encode_decode_2()
 }
 
 
-static char* decode_v1_log()
+static char* decode_v1_log(void)
 {
     const char* v1_log = "jHiccup-2.0.6.logV1.hlog";
     struct hdr_histogram* accum;
@@ -776,7 +788,7 @@ static char* decode_v1_log()
 }
 
 
-static char* decode_v2_log()
+static char* decode_v2_log(void)
 {
     struct hdr_histogram* accum;
     struct hdr_histogram* h = NULL;
@@ -822,7 +834,7 @@ static char* decode_v2_log()
     return 0;
 }
 
-static char* decode_v3_log()
+static char* decode_v3_log(void)
 {
     struct hdr_histogram* accum;
     struct hdr_histogram* h = NULL;
@@ -836,6 +848,10 @@ static char* decode_v3_log()
     const char* v3_log = "jHiccup-2.0.7S.logV3.hlog";
 
     FILE* f = fopen(v3_log, "r");
+    if (NULL == f)
+    {
+        fprintf(stderr, "Open file: [%d] %s", errno, strerror(errno));
+    }
     mu_assert("Can not open v3 log file", f != NULL);
 
     hdr_init(1, INT64_C(3600000000000), 3, &accum);
@@ -868,7 +884,37 @@ static char* decode_v3_log()
     return 0;
 }
 
-static char* decode_v0_log()
+static int parse_line_from_file(const char* filename)
+{
+    struct hdr_histogram *h = NULL;
+    hdr_timespec timestamp;
+    hdr_timespec interval;
+    int result;
+
+    FILE* f = fopen(filename, "r");
+    if (NULL == f)
+    {
+        fprintf(stderr, "Open file: [%d] %s", errno, strerror(errno));
+        return -EIO;
+    }
+
+    result = hdr_log_read(NULL, f, &h, &timestamp, &interval);
+    fclose(f);
+
+    return result;
+}
+
+static char* handle_invalid_log_lines(void)
+{
+    mu_assert("Should have invalid histogram", -EINVAL == parse_line_from_file("test_tagged_invalid_histogram.txt"));
+    mu_assert("Should have invalid tag key", -EINVAL == parse_line_from_file("test_tagged_invalid_tag_key.txt"));
+    mu_assert("Should have invalid timestamp", -EINVAL == parse_line_from_file("test_tagged_invalid_timestamp.txt"));
+    mu_assert("Should have missing histogram", -EINVAL == parse_line_from_file("test_tagged_missing_histogram.txt"));
+
+    return 0;
+}
+
+static char* decode_v0_log(void)
 {
     struct hdr_histogram* accum;
     const char* v1_log = "jHiccup-2.0.1.logV0.hlog";
@@ -913,7 +959,7 @@ static char* decode_v0_log()
     return 0;
 }
 
-static struct mu_result all_tests()
+static struct mu_result all_tests(void)
 {
     tests_run = 0;
 
@@ -945,6 +991,7 @@ static struct mu_result all_tests()
     mu_run_test(decode_v2_log);
     mu_run_test(decode_v1_log);
     mu_run_test(decode_v0_log);
+    mu_run_test(handle_invalid_log_lines);
 
     mu_run_test(test_encode_and_decode_empty);
 
@@ -954,7 +1001,7 @@ static struct mu_result all_tests()
     mu_ok;
 }
 
-static int hdr_histogram_log_run_tests()
+static int hdr_histogram_log_run_tests(void)
 {
     struct mu_result result = all_tests();
 
@@ -972,7 +1019,7 @@ static int hdr_histogram_log_run_tests()
     return result.message == NULL ? 0 : -1;
 }
 
-int main()
+int main(void)
 {
     return hdr_histogram_log_run_tests();
 }

@@ -151,7 +151,7 @@ int zig_zag_decode_i64(const uint8_t* buffer, int64_t* signed_value)
 
 #if defined(_MSC_VER)
 #pragma warning(push)
-#pragma warning(disable: 4146) // C4146: unary minus operator applied to unsigned type, result still unsigned
+#pragma warning(disable: 4146) /* C4146: unary minus operator applied to unsigned type, result still unsigned */
 #endif
     value = (value >> 1) ^ (-(value & 1));
 #if defined(_MSC_VER)
@@ -307,10 +307,10 @@ int hdr_base64_decode(
     size_t i, j;
 
     if (input_len < 4 ||
-        (input_len & 3) != 0 ||
+        (input_len & 3u) != 0 ||
         (input_len / 4) * 3 != output_len)
     {
-        return EINVAL;
+        return -EINVAL;
     }
 
     for (i = 0, j = 0; i < input_len; i += 4, j += 3)

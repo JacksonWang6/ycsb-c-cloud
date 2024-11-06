@@ -4,7 +4,9 @@
 * as explained at http://creativecommons.org/publicdomain/zero/1.0/
 */
 
-#include "hdr_time.h"
+#include <math.h>
+
+#include <hdr/hdr_time.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -93,6 +95,3 @@ void hdr_timespec_from_double(hdr_timespec* t, double value)
     t->tv_sec = seconds;
     t->tv_nsec = milliseconds * 1000000;
 }
-
-
-
