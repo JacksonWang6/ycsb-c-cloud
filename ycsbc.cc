@@ -6,6 +6,7 @@
 //  Copyright (c) 2014 Jinglei Ren <jinglei@ren.systems>.
 //
 
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <iostream>
@@ -86,20 +87,10 @@ int main( const int argc, const char *argv[]) {
     exit(0);
   }
 
-
-  // rocksdb::DB *dbb=((ycsbc::RocksDB*)db)->db_;
-  // rocksdb::CompactRangeOptions cro;
-  // cro.bottommost_level_compaction =
-  // rocksdb::BottommostLevelCompaction::kForceOptimized;
-  // dbb->CompactRange(cro, nullptr, nullptr);
-  // return 0;
-
-
-
   const bool load = utils::StrToBool(props.GetProperty("load","false"));
   const bool run = utils::StrToBool(props.GetProperty("run","false"));
   const int num_threads = stoi(props.GetProperty("threadcount", "1"));
-  const bool print_stats = utils::StrToBool(props["dbstatistics"]);
+  const bool print_stats = true; // utils::StrToBool(props["dbstatistics"]);
   const bool wait_for_balance = utils::StrToBool(props["dbwaitforbalance"]);
 
   vector<future<int>> actual_ops;
@@ -181,6 +172,15 @@ int main( const int argc, const char *argv[]) {
     db->PrintStats();
     printf("-------------------------------------------\n");
   }
+
+  // while (true) {
+  //   sleep(1000);
+  //   printf("waiting compaction\n");
+  // }
+
+  ycsbc::done = true;
+  ycsbc::my_stat_thr.join();
+  ycsbc::rocksdb_stat_thr.join();
   delete db;
   return 0;
 }

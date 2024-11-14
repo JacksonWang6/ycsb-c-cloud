@@ -29,6 +29,11 @@ using std::endl;
 namespace ycsbc {
     class RocksDBCloud : public DB {
     public :
+        enum Layout {
+            ALL_S3,
+            Hyper,
+            ALL_EBS
+        };
         std::atomic<long long> qps;
         struct hdr_histogram* hdr_ = NULL;
         struct hdr_histogram* hdr_last_1s_ = NULL;
@@ -81,6 +86,9 @@ namespace ycsbc {
         unsigned noResult;
 
         void SetOptions(rocksdb::Options *options, utils::Properties &props);
+        void SetLargeOptions(rocksdb::Options *options, utils::Properties &props);
+        void SetLocalOptions(rocksdb::Options *options, utils::Properties &props);
+        void SetSpecialOptions(rocksdb::Options *options, std::string& kDBPath, enum Layout layout);
         void SerializeValues(std::vector<KVPair> &kvs, std::string &value);
         void DeSerializeValues(std::string &value, std::vector<KVPair> &kvs);
 

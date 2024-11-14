@@ -1,48 +1,13 @@
-
-# ROCKSDB_INCLUDE=/home/wjp/rocksdb-cloud/include
-# # RocksDB 的静态链接库
-# ROCKSDB_LIBRARY=/home/wjp/rocksdb-cloud/librocksdb.a
-# ROCKSDB_LIB=/home/ubuntu/yjs_design/AeroDB2/
-# # HDR的静态链接库
-# HDR_LIB=./third-party/HdrHistogram_c/hdr_lib.a
-# HDR_INCLUDES=-I./third-party/HdrHistogram_c/src
-# HDR_LDFLAGS=-lz -lm
-# HDR_CFLAGS=-Wno-unknown-pragmas -Wextra -Wshadow -Winit-self -Wpedantic -D_GNU_SOURCE -fPIC
-
-
-# CC=g++
-# CFLAGS=-std=c++11 -g -Wall -pthread -I./ -I$(ROCKSDB_INCLUDE) -L$(ROCKSDB_LIB)
-# #LDFLAGS= -lpthread -lrocksdb -lz -lbz2 -llz4 -ldl -lsnappy -lnuma -lzstd -lhdr_histogram -lboost_regex -lboost_iostreams -L$(HDR_LIB) 
-# LDFLAGS= -lpthread -lrocksdb -lz -lbz2 -llz4 -ldl -lsnappy -L$(HDR_LIB) -lhdr_histogram -lzstd ${ROCKSDB_LIBRARY} 
-# SUBDIRS= core db 
-# SUBSRCS=$(wildcard core/*.cc) $(wildcard db/*.cc)
-# OBJECTS=$(SUBSRCS:.cc=.o)
-# EXEC=ycsbc
-
-# all: $(SUBDIRS) $(EXEC)
-
-# $(SUBDIRS):
-# 	#$(MAKE) -C $@
-# 	$(MAKE) -C $@ ROCKSDB_INCLUDE=${ROCKSDB_INCLUDE} ROCKSDB_LIBRARY=${ROCKSDB_LIBRARY}
-
-# $(EXEC): $(wildcard *.cc) $(OBJECTS)
-# 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
-
-# clean:
-# 	for dir in $(SUBDIRS); do \
-# 		$(MAKE) -C $$dir $@; \
-# 	done
-# 	$(RM) $(EXEC)
-
-# .PHONY: $(SUBDIRS) $(EXEC)
-
-#######
+HDR_LIB=./third-party/HdrHistogram_c/build/src/libhdr_histogram_static.a
+HDR_INCLUDES=-I./third-party/HdrHistogram_c/include
+HDR_LDFLAGS=-lz -lm
+HDR_CFLAGS=-Wno-unknown-pragmas -Wextra -Wshadow -Winit-self -Wpedantic -D_GNU_SOURCE -fPIC
 
 CC=g++
-CFLAGS=-std=c++17 -g -pthread
-CXXFLAGS=-std=c++17 -g -pthread -I. -I..
+CFLAGS=-std=c++17 -O2 -pthread
+CXXFLAGS=-std=c++17 -O2 -pthread -I. -I..
 INCLUDES=-I./
-LDFLAGS= -lpthread -ltbb
+LDFLAGS= -lpthread -ltbb -L$(HDR_LIB)
 SUBDIRS=core db third-party/HdrHistogram_c
 SUBSRCS=$(wildcard core/*.cc) $(wildcard db/*.cc)
 OBJECTS=$(SUBSRCS:.cc=.o)
@@ -50,18 +15,17 @@ OBJECTS=$(SUBSRCS:.cc=.o)
 TMPVAR := $(OBJECTS)
 OBJECTS = $(filter-out db/rocksdb_db.o db/rocksdb_cloud_db.o db/db_factory.o, $(TMPVAR))
 
-HDR_LIB=./third-party/HdrHistogram_c/hdr_lib.a
-HDR_INCLUDES=-I./third-party/HdrHistogram_c/src
-HDR_LDFLAGS=-lz -lm
-HDR_CFLAGS=-Wno-unknown-pragmas -Wextra -Wshadow -Winit-self -Wpedantic -D_GNU_SOURCE -fPIC
-
-ROCKSDB_LIB=/home/wjp/rocksdb-cloud/librocksdb.a
-ROCKSDB_PLATFORM_CXXFLAGS=-DROCKSDB_USE_RTTI -g -W -Wextra -Wsign-compare -Wshadow -Werror -I. -I./include -std=c++17 -faligned-new -DHAVE_ALIGNED_NEW -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DOS_LINUX -fno-builtin-memcmp -DROCKSDB_FALLOCATE_PRESENT -DSNAPPY -DGFLAGS=1 -DZLIB -DBZIP2 -DLZ4 -DZSTD -DTBB -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_PTHREAD_ADAPTIVE_MUTEX -DROCKSDB_BACKTRACE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -march=native -DHAVE_SSE42 -DHAVE_PCLMUL -DROCKSDB_SUPPORT_THREAD_LOCAL
+MY_LOCAL_BASE_DIR=/home/wjp
+MY_CLOUD_BASE_DIR=/home/ubuntu
+MY_BASE_DIR=${MY_LOCAL_BASE_DIR}#不同的环境需要修改这个变量
+ROCKSDB_LIB=${MY_BASE_DIR}/HyperCloudDB/build/librocksdb.a
+# ROCKSDB_LIB=/home/ubuntu/HyperCloudDB/librocksdb_debug.a
+ROCKSDB_PLATFORM_CXXFLAGS=-DROCKSDB_USE_RTTI -O2 -W -Wextra -Wsign-compare -Wshadow -Werror -I. -I./include -std=c++17 -faligned-new -DHAVE_ALIGNED_NEW -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DOS_LINUX -fno-builtin-memcmp -DROCKSDB_FALLOCATE_PRESENT -DSNAPPY -DGFLAGS=1 -DZLIB -DBZIP2 -DLZ4 -DZSTD -DTBB -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_PTHREAD_ADAPTIVE_MUTEX -DROCKSDB_BACKTRACE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -march=native -DHAVE_SSE42 -DHAVE_PCLMUL -DROCKSDB_SUPPORT_THREAD_LOCAL
 ROCKSDB_PLATFORM_LDFLAGS=-lpthread -lrt -lz -ltbb
 ROCKSDB_EXEC_LDFLAGS=-ldl
-ROCKSDB_INCLUDES=-I/home/wjp/rocksdb-cloud/include
+ROCKSDB_INCLUDES=-I"${MY_BASE_DIR}/HyperCloudDB/include"
 
-ROCKSDB_CLOUD_PLATFORM_CXXFLAGS=-faligned-new -DHAVE_ALIGNED_NEW -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DOS_LINUX -fno-builtin-memcmp -DROCKSDB_FALLOCATE_PRESENT -DSNAPPY -DGFLAGS=1 -DZLIB -DBZIP2 -DLZ4 -DZSTD -DTBB -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_PTHREAD_ADAPTIVE_MUTEX -DROCKSDB_BACKTRACE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -march=native -DHAVE_SSE42 -DHAVE_PCLMUL -DROCKSDB_SUPPORT_THREAD_LOCAL -luring
+ROCKSDB_CLOUD_PLATFORM_CXXFLAGS=-faligned-new -DHAVE_ALIGNED_NEW -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DOS_LINUX -fno-builtin-memcmp -DROCKSDB_FALLOCATE_PRESENT -DSNAPPY -DGFLAGS=1 -DZLIB -DBZIP2 -DLZ4 -DZSTD -DTBB -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_PTHREAD_ADAPTIVE_MUTEX -DROCKSDB_BACKTRACE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -march=native -DHAVE_SSE42 -DHAVE_PCLMUL -DROCKSDB_SUPPORT_THREAD_LOCAL
 ROCKSDB_CLOUD_LDFLAGS=-laws-cpp-sdk-s3 -laws-cpp-sdk-kinesis -laws-cpp-sdk-core -laws-cpp-sdk-transfer -lsnappy -lgflags -lbz2 -llz4 -lzstd
 
 CXXFLAGS+=$(HDR_INCLUDES)
