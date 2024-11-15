@@ -21,6 +21,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <unistd.h>
 
 #include "lib/perf_disk_net_bw.h"
 
@@ -83,7 +84,7 @@ namespace ycsbc
 
     void print_my_status(rocksdb::DB* db) {
         uint64_t intervalSeconds = 1;
-        const std::string &output_file = "./log/my_statistics.log";
+        const std::string &output_file = "./log/hyper_run_8M_1000w_my_statistics.log";
         std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
         if (!outFile.is_open()) {
             std::cerr << "Failed to open output file" << std::endl;
@@ -166,9 +167,9 @@ namespace ycsbc
             uint64_t iter_bytes_read_delta = iter_bytes_read - iter_bytes_read_snap;
 
             outFile << "Rocksdb R/W status: \n";
-            outFile << "write status:> total write op" << number_keys_write*1.0/1000/1000 << "Mops, interval write data size: " << bytes_write_delta*1.0/kMB << "MB, write throughput: " << bytes_write_delta*1.0/kMB/intervalSeconds << "MB/s, write ops: " << number_keys_write_delta*1.0/intervalSeconds << "op/s" << endl;
+            outFile << "write status:> total write op " << number_keys_write*1.0/1000/1000 << "Mops, interval write data size: " << bytes_write_delta*1.0/kMB << "MB, write throughput: " << bytes_write_delta*1.0/kMB/intervalSeconds << "MB/s, write ops: " << number_keys_write_delta*1.0/intervalSeconds << "op/s" << endl;
 
-            outFile << "read status:> total read op" << number_keys_read*1.0/1000/1000 << "Mops, interval read data size: " << bytes_read_delta*1.0/kMB << "MB, read throughput: " << bytes_read_delta*1.0/kMB/intervalSeconds << "MB/s, read ops: " << number_keys_read_delta*1.0/intervalSeconds << "op/s" << endl;
+            outFile << "read status:> total read op " << number_keys_read*1.0/1000/1000 << "Mops, interval read data size: " << bytes_read_delta*1.0/kMB << "MB, read throughput: " << bytes_read_delta*1.0/kMB/intervalSeconds << "MB/s, read ops: " << number_keys_read_delta*1.0/intervalSeconds << "op/s" << endl;
 
             outFile << "iter status:> iter read size: " << iter_bytes_read_delta*1.0/kMB << "MB, iter read throughput: " << iter_bytes_read_delta*1.0/kMB/intervalSeconds << "MB/s, iter seek ops: " << number_db_seek_delta*1.0/intervalSeconds << "op/s, iter next ops: " << number_db_next_delta*1.0/intervalSeconds << "op/s, iter prev ops: " << number_db_prev_delta << "op/s" << endl;
 
@@ -217,7 +218,7 @@ namespace ycsbc
             if (done) {
                 break;
             }
-            const std::string &output_file = "./log/compaction_status.log";
+            const std::string &output_file = "./log/hyper_run_8M_1000w_compaction_status.log";
             std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
             if (!outFile.is_open()) {
                 std::cerr << "Failed to open output file" << std::endl;
@@ -305,9 +306,9 @@ namespace ycsbc
 
         // This is the local directory where the db is stored.
         std::string MY_LOCAL_DBPATH = "/tmp/rocksdb_cloud_ycsb";
-        std::string MY_CLOUD_DBPATH = "/home/ubuntu/gp3/origin_rocksdb_cloud_ycsb_1000w";
-        std::string kDBPath = MY_LOCAL_DBPATH;
-        std::string kBucketSuffix = "ycsb-test";
+        std::string MY_CLOUD_DBPATH = "/home/ubuntu/gp3/hyper_8M_1000w";
+        std::string kDBPath = MY_CLOUD_DBPATH;
+        std::string kBucketSuffix = "hyper.8m.1000w";
         std::string kRegion = "ap-northeast-2";
         const std::string bucketPrefix = "rockset.";
         cloud_fs_options.src_bucket.SetBucketName(kBucketSuffix, bucketPrefix);
@@ -335,8 +336,8 @@ namespace ycsbc
         options.env = cloud_env.release();
         options.create_if_missing = true;
         options.statistics = rocksdb::CreateDBStatistics();
-        // SetOptions(&options, props);
-        SetLocalOptions(&options, props);
+        SetOptions(&options, props);
+        // SetLocalOptions(&options, props);
         SetSpecialOptions(&options, kDBPath, Layout::Hyper);
 
         // No persistent read-cache
@@ -357,6 +358,11 @@ namespace ycsbc
         // 启动后台线程，定期打印statistic
         my_stat_thr = std::thread(print_my_status, db_);
         rocksdb_stat_thr = std::thread(printRocksDBStats, db_);
+
+        // while (true) {
+        //     sleep(10);
+        //     printf("wait for bg compaction\n");
+        // }
     }
 
     void RocksDBCloud::SetLocalOptions(rocksdb::Options *options, utils::Properties &props)

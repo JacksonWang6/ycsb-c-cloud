@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 struct NetStats {
   long long rxBytes; // 接收字节数
@@ -27,10 +28,24 @@ inline std::map<std::string, NetStats> getNetStats() {
     std::istringstream ss(line);
     std::string iface;
     long long rxBytes, txBytes;
-    // 读取接口名称及字节数
-    ss >> iface >> rxBytes;
-    ss.ignore(256, ' '); // 跳过中间的字段
-    ss >> txBytes;
+
+    // 读取接口名称
+    ss >> iface;
+    if (!iface.empty() && iface.back() == ':') {
+      iface.pop_back(); // 去除接口名称中的冒号
+    }
+
+    // 使用 std::vector 存储分割后的字段
+    std::vector<std::string> fields;
+    std::string field;
+    while (ss >> field) {
+      fields.push_back(field);
+    }
+
+    // 获取接收字节数和发送字节数
+    rxBytes = std::stoll(fields[0]); // 接收字节数
+    txBytes = std::stoll(
+        fields[8]); // 发送字节数（索引从0开始，第9个字段是发送字节数）
 
     stats[iface] = {rxBytes, txBytes};
   }
@@ -38,7 +53,7 @@ inline std::map<std::string, NetStats> getNetStats() {
   return stats;
 }
 
-const std::string DISK_NAME = "nvme0n1"; // 指定磁盘名称
+const std::string DISK_NAME = "nvme2n1"; // 指定磁盘名称
 const int SECTOR_SIZE = 512;             // 扇区大小，单位字节
 // 用于存储磁盘的读写扇区数
 struct DiskStats {
