@@ -65,9 +65,9 @@ namespace ycsbc
         outFile << "user write size: " << bytes_write*1.0/kMB << "MB, avg user write throughput: " << bytes_write*1.0/kMB/total_time << "MB/s" << endl;
         outFile << "key write op: " << number_keys_write*1.0/1000/1000 << "Mop, avg key write ops: " << number_keys_write*1.0/total_time/1000 << "kop/s" << endl;
         outFile << "key read op: " << number_keys_read*1.0/1000/1000 << "Mop, avg key read ops: " << number_keys_read*1.0/total_time/1000 << "kop/s" << endl;
-        outFile << "seek op: " << number_db_seek*1.0/1000 << "Kop, avg seek ops: " << number_db_seek*1.0/total_time << "kop/s" << endl;
-        outFile << "next op: " << number_db_next*1.0/1000 << "Kop, avg next ops: " << number_db_next*1.0/total_time << "kop/s" << endl;
-        outFile << "prev op: " << number_db_prev*1.0/1000 << "Kop, avg prev ops: " << number_db_prev*1.0/total_time << "kop/s" << endl;
+        outFile << "seek op: " << number_db_seek*1.0/1000 << "Kop, avg seek ops: " << number_db_seek*1.0/total_time/1000 << "kop/s" << endl;
+        outFile << "next op: " << number_db_next*1.0/1000 << "Kop, avg next ops: " << number_db_next*1.0/total_time/1000 << "kop/s" << endl;
+        outFile << "prev op: " << number_db_prev*1.0/1000 << "Kop, avg prev ops: " << number_db_prev*1.0/total_time/1000 << "kop/s" << endl;
 
         // level hit status
         auto memhit = db->GetOptions().statistics->getTickerCount(MEMTABLE_HIT);
@@ -84,7 +84,7 @@ namespace ycsbc
 
     void print_my_status(rocksdb::DB* db) {
         uint64_t intervalSeconds = 1;
-        const std::string &output_file = "./log/hyper_run_8M_1000w_my_statistics.log";
+        const std::string &output_file = "./log/scan_50_8M_1000w_my_statistics.log";
         std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
         if (!outFile.is_open()) {
             std::cerr << "Failed to open output file" << std::endl;
@@ -218,7 +218,7 @@ namespace ycsbc
             if (done) {
                 break;
             }
-            const std::string &output_file = "./log/hyper_run_8M_1000w_compaction_status.log";
+            const std::string &output_file = "./log/scan_50_8M_1000w_compaction_status.log";
             std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
             if (!outFile.is_open()) {
                 std::cerr << "Failed to open output file" << std::endl;
@@ -425,7 +425,7 @@ namespace ycsbc
         std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
         block_based_options.filter_policy = filter_policy;
         // 256MB的块缓存
-        block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
+        block_based_options.block_cache = rocksdb::NewLRUCache(64 * 1024 * 1024);
         block_based_options.block_size = 16 * 1024;
         options->table_factory.reset(
             rocksdb::NewBlockBasedTableFactory(block_based_options));

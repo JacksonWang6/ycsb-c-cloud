@@ -155,9 +155,9 @@ void CoreWorkload::Init(const utils::Properties &p) {
   field_chooser_ = new UniformGenerator(0, field_count_ - 1);
   
   if (scan_len_dist == "uniform") {
-    scan_len_chooser_ = new UniformGenerator(1, max_scan_len);
+    scan_len_chooser_ = new UniformGenerator(max_scan_len, max_scan_len);
   } else if (scan_len_dist == "zipfian") {
-    scan_len_chooser_ = new ZipfianGenerator(1, max_scan_len);
+    scan_len_chooser_ = new ZipfianGenerator(max_scan_len, max_scan_len);
   } else {
     throw utils::Exception("Distribution not allowed for scan length: " +
         scan_len_dist);
