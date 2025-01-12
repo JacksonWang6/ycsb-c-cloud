@@ -3,6 +3,7 @@
 *.lo
 *.o
 *.obj
+a_my_log/*
 
 # Precompiled Headers
 *.gch

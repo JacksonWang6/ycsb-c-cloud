@@ -17,6 +17,7 @@ namespace ycsbc {
 extern std::thread my_stat_thr;
 extern std::thread rocksdb_stat_thr;
 extern std::atomic<bool> done;
+extern std::atomic<bool> finish;
 
 class DB {
  public:

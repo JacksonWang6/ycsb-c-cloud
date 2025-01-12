@@ -13,6 +13,7 @@
 #include <vector>
 #include <future>
 #include <unistd.h>
+#include "core/db.h"
 #include "core/utils.h"
 #include "core/timer.h"
 #include "core/client.h"
@@ -173,8 +174,10 @@ int main( const int argc, const char *argv[]) {
     printf("-------------------------------------------\n");
   }
 
+  ycsbc::finish = true;
+
   // while (true) {
-  //   sleep(1000);
+  //   sleep(60);
   //   printf("waiting compaction\n");
   // }
 

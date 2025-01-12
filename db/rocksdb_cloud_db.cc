@@ -34,6 +34,9 @@ namespace ycsbc
     std::thread my_stat_thr;
     std::thread rocksdb_stat_thr;
     std::atomic<bool> done = false;
+    std::atomic<bool> finish = false;
+    std::string my_stat_output_file = "./a_my_log/zipfian_read/run_h2_my_stat.log";
+    std::string rocksdb_stat_output_file = "./a_my_log/zipfian_read/run_h2_rocks_stat.log";
     uint64_t user_write_bytes_snap = 0;
     uint64_t user_read_bytes_snap = 0;
     uint64_t number_keys_write_snap = 0;
@@ -79,12 +82,33 @@ namespace ycsbc
         auto l4anduphit = db->GetOptions().statistics->getTickerCount(GET_HIT_L4_AND_UP);
         outFile << "Level hit status: memtable hit " << memhit << ", memtable miss " << memmiss << ", L0 " << l0hit << ", L1 " << l1hit << ", L2 " << l2hit << ", L3 " << l3hit << ", L4andup" << l4anduphit << endl;
 
+        // read his
+        auto read_his = db->GetOptions().statistics->getHistogramString(DB_GET);
+        outFile << "Read Histogram: " << read_his << endl;
+
+        // write his
+        auto write_his = db->GetOptions().statistics->getHistogramString(DB_WRITE);
+        outFile << "Write Histogram: " << write_his << endl;
+
+        // seek his
+        auto seek_his = db->GetOptions().statistics->getHistogramString(DB_SEEK);
+        outFile << "Seek Histogram: " << seek_his << endl;
+
+        // sst read his
+        auto sst_read_his = db->GetOptions().statistics->getHistogramString(SST_READ_MICROS);
+        outFile << "SST Read Histogram: " << sst_read_his << endl;
+
+        // compaction his
+        auto compact_his = db->GetOptions().statistics->getHistogramString(COMPACTION_TIME);
+        outFile << "Compaction Histogram: " << compact_his << endl;
+
+        outFile << db->GetOptions().statistics->ToString() << endl;
         outFile.flush();
     }
 
     void print_my_status(rocksdb::DB* db) {
         uint64_t intervalSeconds = 1;
-        const std::string &output_file = "./log/scan_50_8M_1000w_my_statistics.log";
+        const std::string &output_file = my_stat_output_file;
         std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
         if (!outFile.is_open()) {
             std::cerr << "Failed to open output file" << std::endl;
@@ -212,17 +236,21 @@ namespace ycsbc
     }
 
     void printRocksDBStats(rocksdb::DB* db) {
+        const std::string &output_file = rocksdb_stat_output_file;
+        std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
+        if (!outFile.is_open()) {
+            std::cerr << "Failed to open output file" << std::endl;
+            return;
+        }
         while (true) {
             uint64_t interval = 10;
             std::this_thread::sleep_for(std::chrono::seconds(interval));
             if (done) {
                 break;
             }
-            const std::string &output_file = "./log/scan_50_8M_1000w_compaction_status.log";
-            std::ofstream outFile = std::ofstream(output_file, std::ios_base::app); // 以追加模式打开文件
-            if (!outFile.is_open()) {
-                std::cerr << "Failed to open output file" << std::endl;
-                return;
+            if (finish) {
+                outFile << "write finished, wait compaction finished" << endl;
+                finish = false;
             }
             outFile << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << endl;
             std::string res;
@@ -338,6 +366,7 @@ namespace ycsbc
         options.statistics = rocksdb::CreateDBStatistics();
         SetOptions(&options, props);
         // SetLocalOptions(&options, props);
+        // SetLargeOptions(&options, props);
         SetSpecialOptions(&options, kDBPath, Layout::Hyper);
 
         // No persistent read-cache
@@ -359,10 +388,6 @@ namespace ycsbc
         my_stat_thr = std::thread(print_my_status, db_);
         rocksdb_stat_thr = std::thread(printRocksDBStats, db_);
 
-        // while (true) {
-        //     sleep(10);
-        //     printf("wait for bg compaction\n");
-        // }
     }
 
     void RocksDBCloud::SetLocalOptions(rocksdb::Options *options, utils::Properties &props)
@@ -418,14 +443,17 @@ namespace ycsbc
         options->level0_file_num_compaction_trigger = 8;
         options->level0_slowdown_writes_trigger = 20;
         options->level0_stop_writes_trigger = 36;
+        options->compaction_readahead_size = 4 * 1024 * 1024;
 
 
         rocksdb::BlockBasedTableOptions block_based_options;
+        block_based_options.initial_auto_readahead_size = 256 * 1024;
+        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
         block_based_options.cache_index_and_filter_blocks = 0;
         std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
         block_based_options.filter_policy = filter_policy;
         // 256MB的块缓存
-        block_based_options.block_cache = rocksdb::NewLRUCache(64 * 1024 * 1024);
+        block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
         block_based_options.block_size = 16 * 1024;
         options->table_factory.reset(
             rocksdb::NewBlockBasedTableFactory(block_based_options));
@@ -441,6 +469,7 @@ namespace ycsbc
         options->use_direct_io_for_flush_and_compaction = true;
 
         // L0和L1 256MB
+        options->max_write_buffer_number = 4;
         options->max_bytes_for_level_base = 256ul * 1024 * 1024;
         // memtable 64MB
         options->write_buffer_size = 64 * 1024 * 1024;
@@ -449,12 +478,15 @@ namespace ycsbc
         // 8个后台Compaction线程，2个Flush线程
         options->max_background_compactions = 8;
         options->max_background_flushes = 2;
-        options->level0_file_num_compaction_trigger = 4;
-        options->level0_slowdown_writes_trigger = 20;
-        options->level0_stop_writes_trigger = 36;
+        // options->level0_file_num_compaction_trigger = 4;
+        // options->level0_slowdown_writes_trigger = 20;
+        // options->level0_stop_writes_trigger = 36;
+        options->compaction_readahead_size = 4 * 1024 * 1024;
 
 
         rocksdb::BlockBasedTableOptions block_based_options;
+        block_based_options.initial_auto_readahead_size = 256 * 1024;
+        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
         block_based_options.cache_index_and_filter_blocks = 0;
         std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
         block_based_options.filter_policy = filter_policy;
@@ -635,7 +667,7 @@ namespace ycsbc
         free(hdr_scan_);
         free(hdr_rmw_);
 
-        db_->Flush(FlushOptions());
+        // db_->Flush(FlushOptions());
         delete db_;
         printf("delete\n");
     }

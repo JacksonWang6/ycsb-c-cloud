@@ -53,7 +53,7 @@ inline std::map<std::string, NetStats> getNetStats() {
   return stats;
 }
 
-const std::string DISK_NAME = "nvme2n1"; // 指定磁盘名称
+const std::string DISK_NAME = "nvme1n1"; // 指定磁盘名称
 const int SECTOR_SIZE = 512;             // 扇区大小，单位字节
 // 用于存储磁盘的读写扇区数
 struct DiskStats {
