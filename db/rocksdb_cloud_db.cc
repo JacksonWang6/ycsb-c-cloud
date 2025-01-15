@@ -319,10 +319,6 @@ namespace ycsbc
         }
         fprintf(f_hdr_hiccup_output_, "#mean       95th    99th    99.99th    IOPS\n");
 
-        // set option
-        // rocksdb::Options options;
-        // SetOptions(&options, props);
-
         // aws c++ sdk
         Aws::SDKOptions aws_options;
         aws_options.httpOptions.installSigPipeHandler = true; // fix bug(加入这一行可能够了，也可能和openssl的版本也有关)
@@ -365,10 +361,7 @@ namespace ycsbc
         options.env = cloud_env.release();
         options.create_if_missing = true;
         options.statistics = rocksdb::CreateDBStatistics();
-        SetOptions(&options, props);
-        // SetLocalOptions(&options, props);
-        // SetLargeOptions(&options, props);
-        SetSpecialOptions(&options, kDBPath, Layout::Hyper);
+        SetRocksdbEBSOptions(&options, props, kDBPath);
 
         // No persistent read-cache
         std::string persistent_cache = "";
@@ -390,6 +383,97 @@ namespace ycsbc
         rocksdb_stat_thr = std::thread(printRocksDBStats, db_);
 
     }
+
+    void RocksDBCloud::SetRocksdbEBSOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath) {
+        options->create_if_missing = true;
+        options->compression = rocksdb::kNoCompression;
+        options->compaction_style = rocksdb::kCompactionStyleLevel;
+        options->enable_pipelined_write = true;
+        options->use_direct_reads = true;
+        options->use_direct_io_for_flush_and_compaction = true;
+
+        // L0和L1 256MB
+        options->max_bytes_for_level_base = 256ul * 1024 * 1024;
+        // memtable 64MB
+        options->write_buffer_size = 64 * 1024 * 1024;
+        // 单个SSTable文件的大小64MB
+        options->target_file_size_base = 64 * 1024 * 1024;
+        // 8个后台Compaction线程，2个Flush线程
+        options->max_background_compactions = 8;
+        options->max_background_flushes = 2;
+        options->compaction_readahead_size = 4 * 1024 * 1024;
+
+
+        rocksdb::BlockBasedTableOptions block_based_options;
+        block_based_options.initial_auto_readahead_size = 256 * 1024;
+        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
+        std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
+        block_based_options.filter_policy = filter_policy;
+        // 256MB的块缓存
+        block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
+        block_based_options.block_size = 16 * 1024;
+        options->table_factory.reset(
+            rocksdb::NewBlockBasedTableFactory(block_based_options));
+
+        // 全部在EBS
+        options->hyper_level = 7;
+        options->db_paths = {
+            {kDBPath + "/ebs", 1024l * 1024 * 1024 * 1024},
+            {kDBPath + "/s3", 1024l * 1024 * 1024 * 1024},
+        };
+    }
+
+    void RocksDBCloud::SetHetCloudDBOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath) {
+        options->create_if_missing = true;
+        options->compression = rocksdb::kNoCompression;
+        options->compaction_style = rocksdb::kCompactionStyleLevel;
+        options->enable_pipelined_write = true;
+        options->use_direct_reads = true;
+        options->use_direct_io_for_flush_and_compaction = true;
+
+        // L0和L1 64MB
+        options->max_bytes_for_level_base = 64ul * 1024 * 1024;
+        // memtable 8MB
+        options->write_buffer_size = 8 * 1024 * 1024;
+        // 单个文件的大小8MB
+        options->target_file_size_base = 8 * 1024 * 1024;
+        // 8个后台Compaction线程，2个Flush线程
+        options->max_background_compactions = 8;
+        options->max_background_flushes = 2;
+        options->level0_file_num_compaction_trigger = 8;
+        options->level0_slowdown_writes_trigger = 20;
+        options->level0_stop_writes_trigger = 36;
+        options->compaction_readahead_size = 4 * 1024 * 1024;
+
+
+        rocksdb::BlockBasedTableOptions block_based_options;
+        block_based_options.initial_auto_readahead_size = 256 * 1024;
+        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
+        std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
+        block_based_options.filter_policy = filter_policy;
+        // 64MB的块缓存
+        block_based_options.block_cache = rocksdb::NewLRUCache(64 * 1024 * 1024);
+        block_based_options.block_size = 16 * 1024;
+        options->table_factory.reset(
+            rocksdb::NewBlockBasedTableFactory(block_based_options));
+
+        // L0-L2在EBS，其余的在S3
+        options->hyper_level = 2;
+        options->db_paths = {
+            {kDBPath + "/ebs", 1024l * 1024 * 1024 * 1024},
+            {kDBPath + "/s3", 1024l * 1024 * 1024 * 1024},
+        };
+    }
+
+    void RocksDBCloud::SetRocksMashOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath) {
+        SetHetCloudDBOptions(options, props, kDBPath);
+        // (TODO) RocksMash使用二级缓存
+        // LRUCacheOptions opts(
+        //   static_cast<size_t>(256 * 1024 * 1024));
+        // unsigned long long flash_cache_size = 6ULL * 1024 * 1024 * 1024;
+        // opts.secondary_cache = facebook::rocks_secondary_cache::NewRocksCachelibWrapper(flash_cache_size);
+    }
+
 
     void RocksDBCloud::SetLocalOptions(rocksdb::Options *options, utils::Properties &props)
     {
@@ -421,113 +505,6 @@ namespace ycsbc
 
         options->table_factory.reset(
             rocksdb::NewBlockBasedTableFactory(block_based_options));
-    }
-
-    void RocksDBCloud::SetOptions(rocksdb::Options *options, utils::Properties &props)
-    {
-        options->create_if_missing = true;
-        options->compression = rocksdb::kNoCompression;
-        options->compaction_style = rocksdb::kCompactionStyleLevel;
-        options->enable_pipelined_write = true;
-        options->use_direct_reads = true;
-        options->use_direct_io_for_flush_and_compaction = true;
-
-        // L0和L1 64MB
-        options->max_bytes_for_level_base = 64ul * 1024 * 1024;
-        // memtable 8MB
-        options->write_buffer_size = 8 * 1024 * 1024;
-        // 单个文件的大小8MB
-        options->target_file_size_base = 8 * 1024 * 1024;
-        // 8个后台Compaction线程，2个Flush线程
-        options->max_background_compactions = 8;
-        options->max_background_flushes = 2;
-        options->level0_file_num_compaction_trigger = 8;
-        options->level0_slowdown_writes_trigger = 20;
-        options->level0_stop_writes_trigger = 36;
-        options->compaction_readahead_size = 4 * 1024 * 1024;
-
-
-        rocksdb::BlockBasedTableOptions block_based_options;
-        block_based_options.initial_auto_readahead_size = 256 * 1024;
-        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
-        block_based_options.cache_index_and_filter_blocks = 0;
-        std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
-        block_based_options.filter_policy = filter_policy;
-        // 256MB的块缓存
-        // (TODO) RocksMash使用二级缓存
-        // LRUCacheOptions opts(
-        //   static_cast<size_t>(256 * 1024 * 1024));
-        // unsigned long long flash_cache_size = 6ULL * 1024 * 1024 * 1024;
-        // opts.secondary_cache = facebook::rocks_secondary_cache::NewRocksCachelibWrapper(flash_cache_size);
-
-        block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
-        block_based_options.block_size = 16 * 1024;
-        options->table_factory.reset(
-            rocksdb::NewBlockBasedTableFactory(block_based_options));
-    }
-
-    void RocksDBCloud::SetLargeOptions(rocksdb::Options *options, utils::Properties &props)
-    {
-        options->create_if_missing = true;
-        options->compression = rocksdb::kNoCompression;
-        options->compaction_style = rocksdb::kCompactionStyleLevel;
-        options->enable_pipelined_write = true;
-        options->use_direct_reads = true;
-        options->use_direct_io_for_flush_and_compaction = true;
-
-        // L0和L1 256MB
-        options->max_write_buffer_number = 4;
-        options->max_bytes_for_level_base = 256ul * 1024 * 1024;
-        // memtable 64MB
-        options->write_buffer_size = 64 * 1024 * 1024;
-        // 单个文件的大小64MB
-        options->target_file_size_base = 64 * 1024 * 1024;
-        // 8个后台Compaction线程，2个Flush线程
-        options->max_background_compactions = 8;
-        options->max_background_flushes = 2;
-        // options->level0_file_num_compaction_trigger = 4;
-        // options->level0_slowdown_writes_trigger = 20;
-        // options->level0_stop_writes_trigger = 36;
-        options->compaction_readahead_size = 4 * 1024 * 1024;
-
-
-        rocksdb::BlockBasedTableOptions block_based_options;
-        block_based_options.initial_auto_readahead_size = 256 * 1024;
-        block_based_options.max_auto_readahead_size = 4 * 1024 * 1024;
-        block_based_options.cache_index_and_filter_blocks = 0;
-        std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
-        block_based_options.filter_policy = filter_policy;
-        // 256MB的块缓存
-        block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
-        block_based_options.block_size = 16 * 1024;
-        options->table_factory.reset(
-            rocksdb::NewBlockBasedTableFactory(block_based_options));
-    }
-
-
-    void RocksDBCloud::SetSpecialOptions(rocksdb::Options *options, std::string& kDBPath, enum Layout layout) {
-        if (layout == Layout::ALL_S3) {
-            // 全部放在S3上
-            options->hyper_level = 7;
-            options->db_paths = {
-                {kDBPath + "/s3", 1024l * 1024 * 1024 * 1024},
-                {kDBPath + "/ebs", 1024l * 1024 * 1024 * 1024},
-            };
-        } else if (layout  == Layout::Hyper) {
-            // L0-L2在EBS，其余的在S3
-            options->hyper_level = 2;
-            options->db_paths = {
-                {kDBPath + "/ebs", 1024l * 1024 * 1024 * 1024},
-                {kDBPath + "/s3", 1024l * 1024 * 1024 * 1024},
-            };
-        } else if (layout == Layout::ALL_EBS) {
-            // 全部在EBS
-            options->hyper_level = 7;
-            options->db_paths = {
-                {kDBPath + "/ebs", 1024l * 1024 * 1024 * 1024},
-                {kDBPath + "/s3", 1024l * 1024 * 1024 * 1024},
-            };
-        }
     }
 
     int RocksDBCloud::Read(const std::string &table, const std::string &key, const std::vector<std::string> *fields,

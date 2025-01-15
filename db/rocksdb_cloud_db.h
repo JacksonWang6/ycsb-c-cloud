@@ -85,10 +85,10 @@ namespace ycsbc {
         rocksdb::DBCloud* db_;
         unsigned noResult;
 
-        void SetOptions(rocksdb::Options *options, utils::Properties &props);
-        void SetLargeOptions(rocksdb::Options *options, utils::Properties &props);
         void SetLocalOptions(rocksdb::Options *options, utils::Properties &props);
-        void SetSpecialOptions(rocksdb::Options *options, std::string& kDBPath, enum Layout layout);
+        void SetRocksdbEBSOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath);
+        void SetHetCloudDBOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath);
+        void SetRocksMashOptions(rocksdb::Options *options, utils::Properties &props, std::string& kDBPath);
         void SerializeValues(std::vector<KVPair> &kvs, std::string &value);
         void DeSerializeValues(std::string &value, std::vector<KVPair> &kvs);
 
