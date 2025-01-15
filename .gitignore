@@ -48,3 +48,4 @@ compaction.csv
 compile_commands.json
 
 ./log/*
+draw/*

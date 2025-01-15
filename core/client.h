@@ -155,7 +155,18 @@ inline int Client::TransactionUpdate() {
   return db_.Update(table, key, values);
 }
 
+// 更改这个初始值，让get操作和insert操作的键范围不重复
+std::atomic<uint64_t> uniform_insert_counter(100*10000);
 inline int Client::TransactionInsert() {
+  if (true) {
+    // 插入是uniform的
+    const std::string &table = workload_.NextTable();
+    uint64_t key_num = uniform_insert_counter.fetch_add(1);
+    const std::string &key = std::string("user").append(std::to_string(key_num));
+    std::vector<DB::KVPair> values;
+    workload_.BuildValues(values);
+    return db_.Insert(table, key, values);
+  }
   const std::string &table = workload_.NextTable();
   const std::string &key = workload_.NextSequenceKey();
   std::vector<DB::KVPair> values;
