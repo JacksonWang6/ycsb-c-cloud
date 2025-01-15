@@ -24,6 +24,7 @@
 #include <unistd.h>
 
 #include "lib/perf_disk_net_bw.h"
+// #include "cachelib/allocator/CacheAllocator.h"
 
 
 using namespace std;
@@ -453,6 +454,12 @@ namespace ycsbc
         std::shared_ptr<const rocksdb::FilterPolicy> filter_policy(rocksdb::NewBloomFilterPolicy(10, 0));
         block_based_options.filter_policy = filter_policy;
         // 256MB的块缓存
+        // (TODO) RocksMash使用二级缓存
+        // LRUCacheOptions opts(
+        //   static_cast<size_t>(256 * 1024 * 1024));
+        // unsigned long long flash_cache_size = 6ULL * 1024 * 1024 * 1024;
+        // opts.secondary_cache = facebook::rocks_secondary_cache::NewRocksCachelibWrapper(flash_cache_size);
+
         block_based_options.block_cache = rocksdb::NewLRUCache(256 * 1024 * 1024);
         block_based_options.block_size = 16 * 1024;
         options->table_factory.reset(

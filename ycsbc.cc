@@ -176,10 +176,12 @@ int main( const int argc, const char *argv[]) {
 
   ycsbc::finish = true;
 
-  // while (true) {
-  //   sleep(60);
-  //   printf("waiting compaction\n");
-  // }
+  if (load) {
+    while (true) {
+      sleep(60);
+      printf("waiting compaction\n");
+    }
+  }
 
   ycsbc::done = true;
   ycsbc::my_stat_thr.join();
